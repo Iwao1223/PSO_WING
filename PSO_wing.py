@@ -32,11 +32,14 @@ class Read:
             m = re.search(r'Re0.[0-9]{3}', paths[z1])
             if m:
                 Re_str = m.group()
+            else:
+                Re_str = None
 
             m1 = re.search(r'_[0-9]*_', paths[z1])
             if m1:
                 mix_str = m1.group()
-
+            else:
+                mix_str = None
             Re = int(re.sub(r'\D', '', Re_str))
             mix = int(re.sub(r'\D', '', mix_str))
             df_1['Re'] = Re * 1000
@@ -122,7 +125,7 @@ class Read:
         return self.fx_cl_2d
 
 
-class PSO():
+class PSO:
     def __init__(self, dir2, U, alpha, nu, gamma_object):
         self.dir = dir2
         self.alpha = alpha
@@ -319,7 +322,7 @@ class PSO():
 
         print('---PSO_end---')
         print(global_best_position)
-        print(min(personal_best_scores))
+        print(np.min(personal_best_scores))
         print(x.constraints(global_best_position["x1"], global_best_position["x2"]))
         print(global_best_position["x1"] * self.nu / self.U)
         fig1 = plt.figure()
@@ -331,10 +334,10 @@ class PSO():
         ax1.set_xlabel('$Re$')
         ax1.set_ylabel('$m$')
         ax1.set_zlabel('$Re*Cd$')
-        ax1.scatter3D(global_best_position['x1'], global_best_position['x2'], min(personal_best_scores), color='red')
+        ax1.scatter3D(global_best_position['x1'], global_best_position['x2'], np.min(personal_best_scores), color='red')
 
         return (global_best_position['x1'] * self.nu / self.U, global_best_position['x2'],
-                x.constraints(global_best_position["x1"], global_best_position["x2"]), min(personal_best_scores))
+                x.constraints(global_best_position["x1"], global_best_position["x2"]), np.min(personal_best_scores))
 
 
 if __name__ == '__main__':
@@ -344,10 +347,10 @@ if __name__ == '__main__':
     drag_list = []
     gamma_zure_list = []
 
-    for i in gamma_list:
+    for i1 in gamma_list:
         j = 1
         while j > 0.001:
-            x = PSO('peg32_to_revT', 9.5, 2.5, 0.00001604, i)
+            x = PSO('peg32_to_revT', 9.5, 2.5, 0.00001604, i1)
             output = x.pso()
             j = output[2]
         chord_list.append(output[0])
@@ -381,8 +384,8 @@ if __name__ == '__main__':
     # print(self.chord_fx(0))
     # print(self.delta_y)
     # print(self.y)
-    for i in range(100):
-        area[i] = (chord_fx(y[i]) + chord_fx(y[i + 1])) * delta_y / 2
+    for i2 in range(100):
+        area[i2] = (chord_fx(y[i2]) + chord_fx(y[i2 + 1])) * delta_y / 2
         # print(self.area)
     print('wing area :' + str(np.sum(area) * 2))
 
