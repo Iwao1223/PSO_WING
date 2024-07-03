@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 class Read:
     def __init__(self, dir_1, alpha):
-        self.dir = dir_1
+        self.dir = "airfoil_data\\" + dir_1
         self.alpha = alpha
 
     def read_data(self):
