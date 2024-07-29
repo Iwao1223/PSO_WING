@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # Cording by Sogo Iwao from nasg25(m42) on 2024-5-22.
 
+from merge_airfoil import Merge_Airfoil
+
 from scipy.interpolate import RegularGridInterpolator
 from scipy import interpolate
 import pandas as pd
@@ -131,7 +133,15 @@ class PSO:
         self.alpha = alpha
         self.U = U
         self.nu = nu
-        self.gamma_object = gamma_object
+        self.gamma_list = gamma_object
+        read = Read(self.dir, self.alpha)
+        self.df, self.Re_max = read.read_data()
+        self.fx_cd = read.interpolate_cd()
+        self.fx_cl = read.interpolate_gamma()
+        self.chord_list = []
+        self.mix_list = []
+        self.drag_list = []
+        self.gamma_zure_list = []
 
     # def read_fx(self):
     # read = Read(self.dir,self.alpha)
@@ -188,10 +198,6 @@ class PSO:
 
     def pso(self):
         # print('---PSO_start---')
-        read = Read(self.dir, self.alpha)
-        self.df, self.Re_max = read.read_data()
-        self.fx_cd = read.interpolate_cd()
-        self.fx_cl = read.interpolate_gamma()
         N = 1000  # 粒子の数
         x1_min, x1_max = 30000, self.Re_max
         x2_min, x2_max = 0, 100
@@ -214,8 +220,8 @@ class PSO:
 
         best_particle = np.argmin(fx_pass)
         global_best_position = personal_best_positions[fx_pass_index[best_particle]]
-        print(mu_min)
-        print(alpha_level_initial)
+        # print(mu_min)
+        # print(alpha_level_initial)
         # print(personal_best_positions)
         # print(personal_best_scores)
         # print(best_particle)
@@ -339,24 +345,24 @@ class PSO:
         return (global_best_position['x1'] * self.nu / self.U, global_best_position['x2'],
                 x.constraints(global_best_position["x1"], global_best_position["x2"]), np.min(personal_best_scores))
 
+    def execute(self):
+        for i1 in self.gamma_list:
+            zure = 1
+            while zure > 0.001:
+                self.gamma_object = i1
+                output = self.pso()
+                zure = output[2]
+            self.chord_list.append(output[0])
+            self.mix_list.append(output[1])
+            self.gamma_zure_list.append(output[2])
+            self.drag_list.append(output[3])
+        return self.chord_list,self.mix_list,self.gamma_zure_list,self.drag_list
 
 if __name__ == '__main__':
-    gamma_list = [3.43200674, 3.12414007, 2.4552165, 1.3456708, 0.41288932]
-    chord_list = []
-    mix_list = []
-    drag_list = []
-    gamma_zure_list = []
-
-    for i1 in gamma_list:
-        j = 1
-        while j > 0.001:
-            x = PSO('peg32_to_revT', 9.5, 2.5, 0.00001604, i1)
-            output = x.pso()
-            j = output[2]
-        chord_list.append(output[0])
-        mix_list.append(output[1])
-        gamma_zure_list.append(output[2])
-        drag_list.append(output[3])
+    gamma_list = [3.688137646092975, 3.357820667712207, 2.6395343114078194, 1.4533089846146512, 0.44782811326941674]
+    x = PSO('peg32_to_revT', 9, 3, 0.00001604, gamma_list)
+    result = x.execute()
+    chord_list, mix_list, gamma_zure_list, drag_list = result
     chord_list.insert(1, chord_list[0])
     print(chord_list)
     print(mix_list)
@@ -364,7 +370,14 @@ if __name__ == '__main__':
     print(drag_list)
     print('total_drag:{}'.format(sum(drag_list)))
 
-    span = 28
+    airfoil_root = 'airfoil_date/FOILS/pegasus32'
+    airfoil_tip = 'airfoil_date/FOILS/rev_tip_115_mod'
+
+    airfoil = Merge_Airfoil(airfoil_root, airfoil_tip,mix_list)
+    airfoil_df = airfoil.merge()
+
+
+    span = 27.5
     breakpoint_number = 7
     wing_length = span / breakpoint_number
     station0 = 0
@@ -415,5 +428,5 @@ if __name__ == '__main__':
     print(break_point, chord_list)
     # DataFrameの作成
     df_xwimp = pd.DataFrame(data)
-    output_file_name = 'PEGASUS31' + '.xwimp'
+    output_file_name = 'pso_9_25' + '.xwimp'
     df_xwimp.to_csv(output_file_name, index=False, sep=' ')
