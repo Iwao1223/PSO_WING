@@ -356,11 +356,12 @@ class PSO:
             self.mix_list.append(output[1])
             self.gamma_zure_list.append(output[2])
             self.drag_list.append(output[3])
-        return self.chord_list,self.mix_list,self.gamma_zure_list,self.drag_list
+        return self.chord_list, self.mix_list, self.gamma_zure_list, self.drag_list
+
 
 if __name__ == '__main__':
-    gamma_list = [3.688137646092975, 3.357820667712207, 2.6395343114078194, 1.4533089846146512, 0.44782811326941674]
-    x = PSO('peg32_to_revT', 9, 3, 0.00001604, gamma_list)
+    gamma_list = [3.6547847  , 3.4835221,  3.10831321 ,2.45501507, 0.61483696]
+    x = PSO('peg32_to_revT', 9, 2.5, 0.00001604, gamma_list)
     result = x.execute()
     chord_list, mix_list, gamma_zure_list, drag_list = result
     chord_list.insert(1, chord_list[0])
@@ -370,14 +371,13 @@ if __name__ == '__main__':
     print(drag_list)
     print('total_drag:{}'.format(sum(drag_list)))
 
-    airfoil_root = 'airfoil_date/FOILS/pegasus32'
-    airfoil_tip = 'airfoil_date/FOILS/rev_tip_115_mod'
+    airfoil_root = 'rev_root_140'
+    airfoil_tip = 'rev_tip_115_mod'
 
-    airfoil = Merge_Airfoil(airfoil_root, airfoil_tip,mix_list)
+    airfoil = Merge_Airfoil(airfoil_root, airfoil_tip, mix_list)
     airfoil_df = airfoil.merge()
 
-
-    span = 27.5
+    span = 29.5
     breakpoint_number = 7
     wing_length = span / breakpoint_number
     station0 = 0
@@ -388,7 +388,8 @@ if __name__ == '__main__':
     station5 = span / 2
     area = np.zeros(100)
     print(station0, station1, station2, station3, station4, station5)
-    break_point = [station0, station1, station2, station3, station4, station5]
+    # break_point = [station0, station1, station2, station3, station4, station5]
+    break_point = [0	,1.75	,4.92	,8.15	,11.45	,14.75]
     delta_y = station5 / 100
     y = np.linspace(0, station5, 101)
     chord_fx = interpolate.interp1d(break_point, chord_list)
@@ -428,5 +429,5 @@ if __name__ == '__main__':
     print(break_point, chord_list)
     # DataFrameの作成
     df_xwimp = pd.DataFrame(data)
-    output_file_name = 'pso_9_25' + '.xwimp'
+    output_file_name = 'pso_9_29.' + '.xwimp'
     df_xwimp.to_csv(output_file_name, index=False, sep=' ')

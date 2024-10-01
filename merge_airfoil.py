@@ -11,6 +11,7 @@ class Merge_Airfoil():
     def __init__(self,airfoil1,airfoil2,ratio_list):
         self.airfoil1_name = airfoil1
         self.airfoil2_name = airfoil2
+        self.dir_name = 'airfoil_data/FOILS'
         self.airfoil1 = self.airfoil1_name + '.dat'
         self.airfoil2 = self.airfoil2_name + '.dat'
         self.ratio_list = ratio_list
@@ -19,8 +20,8 @@ class Merge_Airfoil():
     def merge(self):
         
         path = Path.cwd()
-        airfoil1_file = path / self.airfoil1
-        airfoil2_file = path / self.airfoil2
+        airfoil1_file = path / self.dir_name /self.airfoil1
+        airfoil2_file = path / self.dir_name /self.airfoil2
 
         print(airfoil1_file)
         df1 = pd.read_csv(airfoil1_file, header=None, delim_whitespace=True, skipinitialspace=True, skiprows=1, dtype='float16')
@@ -79,10 +80,10 @@ class Merge_Airfoil():
 if __name__ == '__main__':
     #a = range(0,101,5)
     a = [89.06303447460459, 87.77424021938518, 86.08447204631838, 63.329192108405906, 34.14530285418442, 4.159986467699512]
-    airfoil_root = 'airfoil_date/FOILS/dae11'
-    airfoil_tip = 'airfoil_date/FOILS/rev_tip_115_mod'
+    airfoil_root = 'airfoil_data/FOILS/dae11'
+    airfoil_tip = 'airfoil_data/FOILS/rev_tip_115_mod'
 
-    airfoil = Merge_Airfoil(airfoil_root, airfoil_tip, a)
+    airfoil = Merge_Airfoil('dae31', 'dae41', a)
     airfoil_df = airfoil.merge()
 
     #x = Merge_Airfoil('pegasus30','revT',a)
