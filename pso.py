@@ -18,14 +18,15 @@ class Read:
     def __init__(self, dir_1, alpha):
         self.dir = "airfoil_data\\" + dir_1
         self.alpha = alpha
+        self.Re_delta = 5000
 
     def read_data(self):
         print('---Read_start---')
         start = time.time()
         path = Path.cwd()
-        xflr = path / self.dir
-        xflr_g = xflr.iterdir()
-        paths = [str(z) for z in xflr_g]
+        airfoil_data = path / self.dir
+        airfoil_data_g = airfoil_data.iterdir()
+        paths = [str(z) for z in airfoil_data_g]
 
         for z1 in range(len(paths)):
             df_1 = pd.read_csv(paths[z1], usecols=[0, 1, 2, 4], header=None, skiprows=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
@@ -66,7 +67,7 @@ class Read:
         df_alpha_sort['Re*Cd'] = df_alpha_sort['Re'] * df_alpha_sort['Cd']
         # df_alpha_sort['Re*Cl'] = df_alpha_sort['Re'] * df_alpha_sort['Cl']
         df_alpha_sort_Re_Cd = df_alpha_sort[['Re', 'mix', 'Re*Cd']]
-        df_alpha_sort_Re_Cd_drop_index = df_alpha_sort_Re_Cd.index[df_alpha_sort_Re_Cd['Re'] % 5000 != 0]
+        df_alpha_sort_Re_Cd_drop_index = df_alpha_sort_Re_Cd.index[df_alpha_sort_Re_Cd['Re'] % self.Re_delta != 0]
         df_alpha_sort_Re_Cd_bug_bug = df_alpha_sort_Re_Cd.drop(df_alpha_sort_Re_Cd_drop_index)
         df_alpha_sort_Re_Cd_re_bug = df_alpha_sort_Re_Cd_bug_bug.set_index(['Re', 'mix'])
         df_alpha_sort_Re_Cd_re = df_alpha_sort_Re_Cd_re_bug.drop_duplicates()
@@ -77,7 +78,7 @@ class Read:
         foil_alpha_Re_Cd = df_alpha_sort_Re_Cd_unstack_interpolate.to_numpy()
         np.set_printoptions(threshold=1000)
         # print(np.get_printoptions())
-        print(foil_alpha_Re_Cd)
+        print(df_alpha_sort_Re_Cd_unstack)
         # 行の表示を省略しない
         # pd.set_option('display.max_rows', 100)
 
@@ -85,9 +86,9 @@ class Read:
         # pd.set_option('display.max_columns', none)
 
         # print(df_alpha_sort_Re_Cd_unstack_interpolate )
-        # print(foil_alpha_Re_Cd)
+        print(foil_alpha_Re_Cd)
         # 解析データのRe数の幅と間隔
-        x = range(self.Re_min, self.Re_max + 1, 5000)
+        x = range(self.Re_min, self.Re_max + 1, self.Re_delta)
         # 解析データの翼型混合率の幅と間隔
         y = range(0, 101, 5)
         print('---interpolate_cd_start---')
@@ -104,7 +105,7 @@ class Read:
         # df_alpha_sort['Re*Cd'] = df_alpha_sort['Re'] * df_alpha_sort['Cd']
         df_alpha_sort_2['Re*Cl'] = df_alpha_sort_2['Re'] * df_alpha_sort_2['Cl']
         df_alpha_sort_Re_Cl = df_alpha_sort_2[['Re', 'mix', 'Re*Cl']]
-        df_alpha_sort_Re_Cl_drop_index = df_alpha_sort_Re_Cl.index[df_alpha_sort_Re_Cl['Re'] % 5000 != 0]
+        df_alpha_sort_Re_Cl_drop_index = df_alpha_sort_Re_Cl.index[df_alpha_sort_Re_Cl['Re'] % self.Re_delta != 0]
         df_alpha_sort_Re_Cl_bug_bug = df_alpha_sort_Re_Cl.drop(df_alpha_sort_Re_Cl_drop_index)
         df_alpha_sort_Re_Cl_re_bug = df_alpha_sort_Re_Cl_bug_bug.set_index(['Re', 'mix'])
         df_alpha_sort_Re_Cl_re = df_alpha_sort_Re_Cl_re_bug.drop_duplicates()
@@ -114,7 +115,7 @@ class Read:
         foil_alpha_Re_Cl = df_alpha_sort_Re_Cl_unstack_interpolate.to_numpy()
 
         # 解析データのRe数の幅と間隔
-        x = range(self.Re_min, self.Re_max + 1, 5000)
+        x = range(self.Re_min, self.Re_max + 1, self.Re_delta)
         # 解析データの翼型混合率の幅と間隔
         y = range(0, 101, 5)
 
@@ -348,6 +349,7 @@ class PSO:
     def execute(self):
         for i1 in self.gamma_list:
             zure = 1
+            output = None
             while zure > 0.001:
                 self.gamma_object = i1
                 output = self.pso()
