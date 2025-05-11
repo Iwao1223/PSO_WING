@@ -332,16 +332,16 @@ class PSO:
         print(np.min(personal_best_scores))
         print(x.constraints(global_best_position["x1"], global_best_position["x2"]))
         print(global_best_position["x1"] * self.nu / self.U)
-        fig1 = plt.figure()
-        ax1 = fig1.add_subplot(projection='3d')
-        x1_coord = np.linspace(x1_min, x1_max, 100)
-        x2_coord = np.linspace(x2_min, x2_max, 100)
-        X, Y = np.meshgrid(x1_coord, x2_coord)
-        ax1.plot_wireframe(X, Y, x.fitness(X, Y), color='b', rstride=2, cstride=2, linewidth=0.3)
-        ax1.set_xlabel('$Re$')
-        ax1.set_ylabel('$m$')
-        ax1.set_zlabel('$Re*Cd$')
-        ax1.scatter3D(global_best_position['x1'], global_best_position['x2'], np.min(personal_best_scores), color='red')
+        # fig1 = plt.figure()
+        # ax1 = fig1.add_subplot(projection='3d')
+        # x1_coord = np.linspace(x1_min, x1_max, 100)
+        # x2_coord = np.linspace(x2_min, x2_max, 100)
+        # X, Y = np.meshgrid(x1_coord, x2_coord)
+        # ax1.plot_wireframe(X, Y, x.fitness(X, Y), color='b', rstride=2, cstride=2, linewidth=0.3)
+        # ax1.set_xlabel('$Re$')
+        # ax1.set_ylabel('$m$')
+        # ax1.set_zlabel('$Re*Cd$')
+        # ax1.scatter3D(global_best_position['x1'], global_best_position['x2'], np.min(personal_best_scores), color='red')
 
         return (global_best_position['x1'] * self.nu / self.U, global_best_position['x2'],
                 x.constraints(global_best_position["x1"], global_best_position["x2"]), np.min(personal_best_scores))
@@ -350,7 +350,7 @@ class PSO:
         for i1 in self.gamma_list:
             zure = 1
             output = None
-            while zure > 0.001:
+            while zure > 0.01:
                 self.gamma_object = i1
                 output = self.pso()
                 zure = output[2]
@@ -360,13 +360,40 @@ class PSO:
             self.drag_list.append(output[3])
         return self.chord_list, self.mix_list, self.gamma_zure_list, self.drag_list
 
+class Calcurate_Cd(PSO):
+    def __init__(self, break_point, chord_list, mix_list, dir2, U, alpha, nu, gamma_object):
+        super().__init__(dir2, U, alpha, nu, gamma_object)
+        self.break_point = break_point
+        self.chord_list = chord_list
+        self.mix_list = mix_list
+        self.chord_fx = interpolate.interp1d(break_point, chord_list)
+        self.mix_fx = interpolate.interp1d(break_point, mix_list)
 
+    def calcularate_cd(self):
+        n_cd = 50
+        mu = 1.869e-5
+        D_n = 0
+        for i in range(len(self.break_point) - 1):
+            brock_span = self.break_point[i + 1] - self.break_point[i]
+            delta_c = brock_span / n_cd
+            print(D_n)
+            for j in range(n_cd):
+                y = self.break_point[i] + delta_c * (0.5 + j)
+                Re_n = self.chord_fx(y) * self.U / self.nu
+                mix_n = self.mix_fx(y)
+                Re_Cd_n = self.fx_cd((Re_n, mix_n))
+                D_n += mu * self.U * delta_c * Re_Cd_n / 2
+
+        print('抗力')
+        print(D_n)
+        return D_n
 if __name__ == '__main__':
-    gamma_list = [3.6547847  , 3.4835221,  3.10831321 ,2.45501507, 0.61483696]
-    x = PSO('peg32_to_revT', 9, 2.5, 0.00001604, gamma_list)
+    gamma_list = [3.88337715 , 3.58255867, 3.06876475 ,2.22976612, 0.54793076]
+    x = PSO('revR', 9, 2.5, 0.00001604, gamma_list)
     result = x.execute()
     chord_list, mix_list, gamma_zure_list, drag_list = result
     chord_list.insert(1, chord_list[0])
+    mix_list.insert(1, mix_list[0])
     print(chord_list)
     print(mix_list)
     print(gamma_zure_list)
@@ -379,7 +406,7 @@ if __name__ == '__main__':
     airfoil = Merge_Airfoil(airfoil_root, airfoil_tip, mix_list)
     airfoil_df = airfoil.merge()
 
-    span = 29.5
+    span = 29
     breakpoint_number = 7
     wing_length = span / breakpoint_number
     station0 = 0
@@ -391,7 +418,7 @@ if __name__ == '__main__':
     area = np.zeros(100)
     print(station0, station1, station2, station3, station4, station5)
     # break_point = [station0, station1, station2, station3, station4, station5]
-    break_point = [0	,1.75	,4.92	,8.15	,11.45	,14.75]
+    break_point = [0, 1.85	,5.08	,8.34	,11.705	,14.5]
     delta_y = station5 / 100
     y = np.linspace(0, station5, 101)
     chord_fx = interpolate.interp1d(break_point, chord_list)
@@ -405,6 +432,10 @@ if __name__ == '__main__':
         # print(self.area)
     print('wing area :' + str(np.sum(area) * 2))
 
+    calc_cd = Calcurate_Cd(break_point, chord_list, mix_list, 'revR', 9, 2.5, 0.00001604, gamma_list)
+    total_cd = calc_cd.calcularate_cd()
+
+
     b = chord_fx(y)
     front = b * 0.31
     rear = b * (1 - 0.31) * -1
@@ -412,7 +443,8 @@ if __name__ == '__main__':
     ax.plot(y, front, color='r')
     ax.plot(y, rear, color='r')
     ax.set_aspect('equal')
-    ax.set_title('翼平面形')
+    ax.set_title('wing')
+    plt.show()
 
     # データの定義
     data = {
