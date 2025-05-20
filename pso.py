@@ -144,7 +144,13 @@ class PSO:
         self.x2 = AirfoilThickness(self.airfoil_tip, spar_loc)
         self.max_thickness_T, self.max_thickness_loc_T, self.thickness_loc_T = self.x2.airfoil_thickness()
         self.max_thickness_gradient = (self.max_thickness_T - self.max_thickness_R) / 100
-        self.thcikness_loc_gradient = (self.thickness_loc_T - self.thickness_loc_R) / 100
+        self.thickness_loc_gradient = (self.thickness_loc_T - self.thickness_loc_R) / 100
+        if spar_loc == None:
+            self.thickness_gradient = self.max_thickness_gradient
+            self.thickness_R = self.max_thickness_R
+        else:
+            self.thickness_gradient = self.thickness_loc_gradient
+            self.thickness_R = self.thickness_loc_R
         read = Read(self.dir, self.alpha)
         self.df, self.Re_max, self.Re_min = read.read_data()
         self.fx_cd = read.interpolate_cd()
@@ -175,13 +181,13 @@ class PSO:
         mu_gamma = abs(1 - gamma / self.gamma_object)
 
         # m（混合率）から線形補間で最大翼厚を計算
-        max_thickness = self.max_thickness_R + (self.max_thickness_gradient * m)
+        max_thickness = self.thickness_R + (self.thickness_gradient * m)
         thickness = max_thickness * Re / self.U * self.nu
         mu_thickness = 0
         if self.thickness_min is not None and thickness < self.thickness_min:
             mu_thickness = abs(self.thickness_min - thickness)
 
-        return mu_gamma + mu_thickness
+        return mu_gamma + mu_thickness * 10
 
     def update_position(self, x1, x2, vx1, vx2):
         new_x1 = x1 + vx1
@@ -355,7 +361,7 @@ class PSO:
         print('最小評価値:', np.min(personal_best_scores))
         print('制約違反度:', x.constraints(global_best_position["x1"], global_best_position["x2"]))
         print('最適コード長:', global_best_position["x1"] * self.nu / self.U)
-        print('翼型厚さ:', global_best_position["x1"] * self.nu / self.U*(self.max_thickness_R + (self.max_thickness_gradient * global_best_position["x2"])))
+        print('翼型厚さ:', global_best_position["x1"] * self.nu / self.U*(self.thickness_R + (self.thickness_gradient * global_best_position["x2"])))
 
         # fig1 = plt.figure()
         # ax1 = fig1.add_subplot(projection='3d')
@@ -370,7 +376,7 @@ class PSO:
 
         return (global_best_position['x1'] * self.nu / self.U, global_best_position['x2'],
                 x.constraints(global_best_position["x1"], global_best_position["x2"]), np.min(personal_best_scores),
-                global_best_position["x1"] * self.nu / self.U * (self.max_thickness_R + (self.max_thickness_gradient * global_best_position["x2"]))*1000)
+                global_best_position["x1"] * self.nu / self.U * (self.thickness_R + (self.thickness_gradient * global_best_position["x2"]))*1000)
 
     def execute(self):
         for i1 in range(len(self.gamma_list)):
@@ -417,20 +423,20 @@ class Calcurate_Cd(PSO):
         return D_n * 2
 if __name__ == '__main__':
     gamma_list = [3.88295274,  3.58216713, 3.06842937, 2.22952243, 0.54787087]
-    thickness_list = [105.1,	94.238,	82.856,	48.264,	28.428]
+    thickness_list = [105.1,	94.238,	82.856,	48.264,	0]
 
     break_point = [0, 1.85,	5.08,	8.34,	11.705,	14.5]
     airfoil_root = 'dae31'
     airfoil_tip = 'dae41'
 
-    x = PSO('dae31_to_dae41', 9, 2.5, 0.00001604, gamma_list, thickness_list, airfoil_root, airfoil_tip, 35)
+    x = PSO('dae31_to_dae41', 9, 2.5, 0.00001604, gamma_list, thickness_list, airfoil_root, airfoil_tip, 39)
     result = x.execute()
     chord_list, mix_list, gamma_zure_list, drag_list, thickness_list_result = result
     chord_list.insert(1, chord_list[0])
     mix_list.insert(1, mix_list[0])
     calc_cd = Calcurate_Cd(
         break_point, chord_list, mix_list, 'dae31_to_dae41', 9, 2.5, 0.00001604,
-        gamma_list, thickness_list, airfoil_root, airfoil_tip, 35
+        gamma_list, thickness_list, airfoil_root, airfoil_tip, 39
     )
     total_cd = calc_cd.calcularate_cd()
     print('翼弦長:', chord_list)

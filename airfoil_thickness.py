@@ -42,7 +42,7 @@ class AirfoilThickness:
         return max_thickness_par, max_thickness_loc_par, thickness_loc_par
 
 if __name__ == '__main__':
-    x = AirfoilThickness('dae41', 50)
+    x = AirfoilThickness('dae31', 39)
     max_thickness, max_thickness_loc, thickness_loc = x.airfoil_thickness()
     print(max_thickness, max_thickness_loc, thickness_loc)
 
