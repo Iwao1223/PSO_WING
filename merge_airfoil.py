@@ -23,7 +23,7 @@ class Merge_Airfoil():
         airfoil1_file = path / self.dir_name /self.airfoil1
         airfoil2_file = path / self.dir_name /self.airfoil2
 
-        print(airfoil1_file)
+        #print(airfoil1_file)
         df1 = pd.read_csv(airfoil1_file, header=None, delim_whitespace=True, skipinitialspace=True, skiprows=1, dtype='float16')
         df2 = pd.read_csv(airfoil2_file, header=None, delim_whitespace=True, skipinitialspace=True, skiprows=1, dtype='float16')
         

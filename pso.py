@@ -2,6 +2,7 @@
 # Cording by Sogo Iwao from nasg25(m42) on 2024-5-22.
 
 from merge_airfoil import Merge_Airfoil
+from airfoil_thickness import AirfoilThickness
 
 from scipy.interpolate import RegularGridInterpolator
 from scipy import interpolate
@@ -55,11 +56,11 @@ class Read:
 
         self.Re_max = self.df['Re'].max()
         self.Re_min = self.df['Re'].min()
-        print(self.df)
+        #print(self.df)
         end = time.time()
         print('処理時間:', end - start)
         print('---Read_end---')
-        return self.df, self.Re_max
+        return self.df, self.Re_max, self.Re_min
 
     def interpolate_cd(self):
         df_alpha = self.df[self.df['alpha'] == self.alpha]
@@ -129,20 +130,30 @@ class Read:
 
 
 class PSO:
-    def __init__(self, dir2, U, alpha, nu, gamma_object):
+    def __init__(self, dir2, U, alpha, nu, gamma_object, thickness_min_list, aifolil_root, airfoil_tip, spar_loc):
         self.dir = dir2
         self.alpha = alpha
         self.U = U
         self.nu = nu
         self.gamma_list = gamma_object
+        self.thickness_min_list = np.array(thickness_min_list) / 1000 # mm to m
+        self.airfoil_root = aifolil_root
+        self.airfoil_tip = airfoil_tip
+        self.x1 = AirfoilThickness(self.airfoil_root, spar_loc)
+        self.max_thickness_R, self.max_thickness_loc_R, self.thickness_loc_R = self.x1.airfoil_thickness()
+        self.x2 = AirfoilThickness(self.airfoil_tip, spar_loc)
+        self.max_thickness_T, self.max_thickness_loc_T, self.thickness_loc_T = self.x2.airfoil_thickness()
+        self.max_thickness_gradient = (self.max_thickness_T - self.max_thickness_R) / 100
+        self.thcikness_loc_gradient = (self.thickness_loc_T - self.thickness_loc_R) / 100
         read = Read(self.dir, self.alpha)
-        self.df, self.Re_max = read.read_data()
+        self.df, self.Re_max, self.Re_min = read.read_data()
         self.fx_cd = read.interpolate_cd()
         self.fx_cl = read.interpolate_gamma()
         self.chord_list = []
         self.mix_list = []
         self.drag_list = []
         self.gamma_zure_list = []
+        self.thickness_min = []
 
     # def read_fx(self):
     # read = Read(self.dir,self.alpha)
@@ -152,13 +163,25 @@ class PSO:
 
     def fitness(self, Re, m):
         # print(Re)
+        Re = np.clip(Re, self.Re_min, self.Re_max)
+        m = np.clip(m, 0, 100)
         z = self.fx_cd((Re, m))
         return z
 
     def constraints(self, Re, m):
+        Re = np.clip(Re, self.Re_min, self.Re_max)
+        m = np.clip(m, 0, 100)
         gamma = self.fx_cl((Re, m)) * self.nu / 2
-        mu = abs(1 - gamma / self.gamma_object)
-        return mu
+        mu_gamma = abs(1 - gamma / self.gamma_object)
+
+        # m（混合率）から線形補間で最大翼厚を計算
+        max_thickness = self.max_thickness_R + (self.max_thickness_gradient * m)
+        thickness = max_thickness * Re / self.U * self.nu
+        mu_thickness = 0
+        if self.thickness_min is not None and thickness < self.thickness_min:
+            mu_thickness = abs(self.thickness_min - thickness)
+
+        return mu_gamma + mu_thickness
 
     def update_position(self, x1, x2, vx1, vx2):
         new_x1 = x1 + vx1
@@ -227,7 +250,7 @@ class PSO:
         # print(personal_best_scores)
         # print(best_particle)
         # print(global_best_position)
-        print('---PSO_start---')
+        #print('---PSO_start---')
         T = 30  # 制限時間(ループの回数)
         for t in range(T):
             fx_pass.clear()
@@ -328,10 +351,12 @@ class PSO:
                     global_best_position = personal_best_positions[fx_pass_index[best_particle]]
 
         print('---PSO_end---')
-        print(global_best_position)
-        print(np.min(personal_best_scores))
-        print(x.constraints(global_best_position["x1"], global_best_position["x2"]))
-        print(global_best_position["x1"] * self.nu / self.U)
+        print('最適粒子位置(Re,mix):', global_best_position)
+        print('最小評価値:', np.min(personal_best_scores))
+        print('制約違反度:', x.constraints(global_best_position["x1"], global_best_position["x2"]))
+        print('最適コード長:', global_best_position["x1"] * self.nu / self.U)
+        print('翼型厚さ:', global_best_position["x1"] * self.nu / self.U*(self.max_thickness_R + (self.max_thickness_gradient * global_best_position["x2"])))
+
         # fig1 = plt.figure()
         # ax1 = fig1.add_subplot(projection='3d')
         # x1_coord = np.linspace(x1_min, x1_max, 100)
@@ -344,25 +369,31 @@ class PSO:
         # ax1.scatter3D(global_best_position['x1'], global_best_position['x2'], np.min(personal_best_scores), color='red')
 
         return (global_best_position['x1'] * self.nu / self.U, global_best_position['x2'],
-                x.constraints(global_best_position["x1"], global_best_position["x2"]), np.min(personal_best_scores))
+                x.constraints(global_best_position["x1"], global_best_position["x2"]), np.min(personal_best_scores),
+                global_best_position["x1"] * self.nu / self.U * (self.max_thickness_R + (self.max_thickness_gradient * global_best_position["x2"]))*1000)
 
     def execute(self):
-        for i1 in self.gamma_list:
+        for i1 in range(len(self.gamma_list)):
             zure = 1
             output = None
             while zure > 0.01:
-                self.gamma_object = i1
+                self.gamma_object = self.gamma_list[i1]
+                self.thickness_min = self.thickness_min_list[i1]
+                print('\n' + '='*40)
+                print(f'🚀🚀🚀   PSO アルゴリズム開始   🚀🚀🚀   ＜{i1+1}区間目＞')
+                print('='*40 + '\n')
                 output = self.pso()
                 zure = output[2]
             self.chord_list.append(output[0])
             self.mix_list.append(output[1])
             self.gamma_zure_list.append(output[2])
             self.drag_list.append(output[3])
-        return self.chord_list, self.mix_list, self.gamma_zure_list, self.drag_list
+            self.thickness_min_list[i1] = output[4]
+        return self.chord_list, self.mix_list, self.gamma_zure_list, self.drag_list, self.thickness_min_list
 
 class Calcurate_Cd(PSO):
-    def __init__(self, break_point, chord_list, mix_list, dir2, U, alpha, nu, gamma_object):
-        super().__init__(dir2, U, alpha, nu, gamma_object)
+    def __init__(self, break_point, chord_list, mix_list, dir2, U, alpha, nu, gamma_object, thickness_min_list, airfoil_root, airfoil_tip, spar_loc):
+        super().__init__(dir2, U, alpha, nu, gamma_object, thickness_min_list, airfoil_root, airfoil_tip, spar_loc)
         self.break_point = break_point
         self.chord_list = chord_list
         self.mix_list = mix_list
@@ -376,7 +407,6 @@ class Calcurate_Cd(PSO):
         for i in range(len(self.break_point) - 1):
             brock_span = self.break_point[i + 1] - self.break_point[i]
             delta_c = brock_span / n_cd
-            print(D_n)
             for j in range(n_cd):
                 y = self.break_point[i] + delta_c * (0.5 + j)
                 Re_n = self.chord_fx(y) * self.U / self.nu
@@ -384,56 +414,58 @@ class Calcurate_Cd(PSO):
                 Re_Cd_n = self.fx_cd((Re_n, mix_n))
                 D_n += mu * self.U * delta_c * Re_Cd_n / 2
 
-        print('抗力')
-        print(D_n)
-        return D_n
+        return D_n * 2
 if __name__ == '__main__':
-    gamma_list = [3.88337715 , 3.58255867, 3.06876475 ,2.22976612, 0.54793076]
-    x = PSO('revR', 9, 2.5, 0.00001604, gamma_list)
+    gamma_list = [3.88295274,  3.58216713, 3.06842937, 2.22952243, 0.54787087]
+    thickness_list = [105.1,	94.238,	82.856,	48.264,	28.428]
+
+    break_point = [0, 1.85,	5.08,	8.34,	11.705,	14.5]
+    airfoil_root = 'dae31'
+    airfoil_tip = 'dae41'
+
+    x = PSO('dae31_to_dae41', 9, 2.5, 0.00001604, gamma_list, thickness_list, airfoil_root, airfoil_tip, 35)
     result = x.execute()
-    chord_list, mix_list, gamma_zure_list, drag_list = result
+    chord_list, mix_list, gamma_zure_list, drag_list, thickness_list_result = result
     chord_list.insert(1, chord_list[0])
     mix_list.insert(1, mix_list[0])
-    print(chord_list)
-    print(mix_list)
-    print(gamma_zure_list)
-    print(drag_list)
-    print('total_drag:{}'.format(sum(drag_list)))
-
-    airfoil_root = 'rev_root_140'
-    airfoil_tip = 'rev_tip_115_mod'
+    calc_cd = Calcurate_Cd(
+        break_point, chord_list, mix_list, 'dae31_to_dae41', 9, 2.5, 0.00001604,
+        gamma_list, thickness_list, airfoil_root, airfoil_tip, 35
+    )
+    total_cd = calc_cd.calcularate_cd()
+    print('翼弦長:', chord_list)
+    print('翼型混合率:', mix_list)
+    print('ガンマずれリスト:', gamma_zure_list)
+    print('最小厚さリスト:', thickness_list_result)
+    print('形状抗力:', total_cd)
 
     airfoil = Merge_Airfoil(airfoil_root, airfoil_tip, mix_list)
     airfoil_df = airfoil.merge()
 
-    span = 29
-    breakpoint_number = 7
-    wing_length = span / breakpoint_number
-    station0 = 0
-    station1 = wing_length / 2
-    station2 = station1 + wing_length
-    station3 = station2 + wing_length
-    station4 = station3 + wing_length - 1
-    station5 = span / 2
-    area = np.zeros(100)
-    print(station0, station1, station2, station3, station4, station5)
+    span = break_point[-1] * 2
+    # breakpoint_number = 7
+    # wing_length = span / breakpoint_number
+    # station0 = 0
+    # station1 = wing_length / 2
+    # station2 = station1 + wing_length
+    # station3 = station2 + wing_length
+    # station4 = station3 + wing_length - 1
+    # station5 = span / 2
+    # print(station0, station1, station2, station3, station4, station5)
     # break_point = [station0, station1, station2, station3, station4, station5]
-    break_point = [0, 1.85	,5.08	,8.34	,11.705	,14.5]
-    delta_y = station5 / 100
-    y = np.linspace(0, station5, 101)
+
+    area = np.zeros(100)
+    delta_y = break_point[-1] / 100
+    y = np.linspace(0, break_point[-1], 101)
     chord_fx = interpolate.interp1d(break_point, chord_list)
-    # thickness_mm = self.chord * self.airfoil_thickness
-    # thickness_fx = interpolate.interp1d(self.breakpoint,self.thickness_mm)
-    # print(self.chord_fx(0))
-    # print(self.delta_y)
-    # print(self.y)
     for i2 in range(100):
         area[i2] = (chord_fx(y[i2]) + chord_fx(y[i2 + 1])) * delta_y / 2
-        # print(self.area)
-    print('wing area :' + str(np.sum(area) * 2))
+    wing_area = np.sum(area) * 2
+    aspect_ratio = (span ** 2) / wing_area
+    print('翼面積 :' + str(wing_area))
+    print('アスペクト比 :' + str(aspect_ratio))
 
-    calc_cd = Calcurate_Cd(break_point, chord_list, mix_list, 'revR', 9, 2.5, 0.00001604, gamma_list)
-    total_cd = calc_cd.calcularate_cd()
+
 
 
     b = chord_fx(y)
