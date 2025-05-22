@@ -75,7 +75,7 @@ class Merge_Airfoil():
             self.df_list.append(df_output_bug)
             output_file_name = self.airfoil_name + '.dat'
             df_output.to_csv(output_file_name, header=False, index=False, sep=' ')
-        return self.df_list
+        return df_output_bug
             
 if __name__ == '__main__':
     #a = range(0,101,5)

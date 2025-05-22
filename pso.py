@@ -3,7 +3,7 @@
 
 from merge_airfoil import Merge_Airfoil
 from airfoil_thickness import AirfoilThickness
-from airfoil_interpolate import AirfoilInterpolate
+from plot import WingPlotter
 
 from scipy.interpolate import RegularGridInterpolator
 from scipy import interpolate
@@ -383,7 +383,7 @@ class PSO:
         for i1 in range(len(self.gamma_list)):
             zure = 1
             output = None
-            while zure > 0.1:
+            while zure > 0.01:
                 self.gamma_object = self.gamma_list[i1]
                 self.thickness_min = self.thickness_min_list[i1]
                 print('\n' + '='*40)
@@ -435,6 +435,8 @@ if __name__ == '__main__':
     chord_list, mix_list, gamma_zure_list, drag_list, thickness_list_result = result
     chord_list.insert(1, chord_list[0])
     mix_list.insert(1, mix_list[0])
+    gamma_zure_list.insert(1, gamma_zure_list[0])
+    thickness_list_result.insert(1, thickness_list_result[0])
     calc_cd = Calcurate_Cd(
         break_point, chord_list, mix_list, 'dae31_to_dae41', 9, 2.5, 0.00001604,
         gamma_list, thickness_list, airfoil_root, airfoil_tip, 39
@@ -447,7 +449,7 @@ if __name__ == '__main__':
     print('形状抗力:', total_cd)
 
     airfoil = Merge_Airfoil(airfoil_root, airfoil_tip, mix_list)
-    #airfoil_df = airfoil.merge()
+    airfoil_df = airfoil.merge()
 
     span = break_point[-1] * 2
     # breakpoint_number = 7
@@ -472,18 +474,20 @@ if __name__ == '__main__':
     print('翼面積 :' + str(wing_area))
     print('アスペクト比 :' + str(aspect_ratio))
 
+    # プロット
+    plotter = WingPlotter(airfoil_root, airfoil_tip, break_point, chord_list, mix_list)
+    plotter.plot_surface()
 
-
-
-    b = chord_fx(y)
-    front = b * 0.31
-    rear = b * (1 - 0.31) * -1
-    fig, ax = plt.subplots()
-    ax.plot(y, front, color='r')
-    ax.plot(y, rear, color='r')
-    ax.set_aspect('equal')
-    ax.set_title('wing')
-    plt.show()
+    #
+    # b = chord_fx(y)
+    # front = b * 0.31
+    # rear = b * (1 - 0.31) * -1
+    # fig, ax = plt.subplots()
+    # ax.plot(y, front, color='r')
+    # ax.plot(y, rear, color='r')
+    # ax.set_aspect('equal')
+    # ax.set_title('wing')
+    # plt.show()
 
     # データの定義
     data = {
@@ -503,46 +507,4 @@ if __name__ == '__main__':
     # DataFrameの作成
     df_xwimp = pd.DataFrame(data)
     output_file_name = 'pso_9_29.' + '.xwimp'
-    #df_xwimp.to_csv(output_file_name, index=False, sep=' ')
-
-
-    def plot_stylish_wing(y_list, chord_list, mix_list, airfoil_shape_func):
-        fig = plt.figure(figsize=(12, 6))
-        ax = fig.add_subplot(111, projection='3d')
-        max_mix = max(mix_list)
-        for i, y in enumerate(y_list):
-            x_af, z_af = airfoil_shape_func(mix_list[i])  # mix率で翼型座標取得
-            x_af = x_af * chord_list[i]
-            z_af = z_af * chord_list[i]
-            y_af = np.full_like(x_af, y)
-            color = plt.cm.viridis(mix_list[i] / max_mix)
-            ax.plot(x_af, y_af, z_af, color=color, alpha=0.8, lw=2)
-        ax.set_xlabel('Chordwise (x)')
-        ax.set_ylabel('Spanwise (y)')
-        ax.set_zlabel('Thickness (z)')
-        ax.set_title('Stylish 3D Wing')
-        ax.view_init(elev=20, azim=-60)
-        plt.tight_layout()
-        plt.show()
-
-
-    # 例: airfoil_shape_func のダミー実装
-
-    def airfoil_shape_func(mix):
-        dir_name = 'airfoil_data/FOILS'
-        airfoil = airfoil_root + '.dat'
-        path = Path.cwd()
-        airfoil_file = path / dir_name / airfoil
-        airfoil_df = pd.read_csv(airfoil_file, header=None, delim_whitespace=True, skipinitialspace=True, skiprows=1,
-                                 dtype='float16')
-        airfoil_fx = AirfoilInterpolate(airfoil_df, 1, 0)
-        airfoil_top_fx, airfoil_bottom_fx = airfoil_fx.airfoil_interpolate()
-        x = np.linspace(0.1, 0.98, 100)
-        z_top = airfoil_top_fx(x)
-        z_bottom = airfoil_bottom_fx(x)
-        z = np.concatenate([z_top, z_bottom[::-1]])
-        x_full = np.concatenate([x, x[::-1]])  # x も z と同じ長さにする
-        return x_full, z
-
-
-    plot_stylish_wing(break_point, chord_list, mix_list, airfoil_shape_func)
+    df_xwimp.to_csv(output_file_name, index=False, sep=' ')

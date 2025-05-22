@@ -3,23 +3,19 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from airfoil_interpolate import AirfoilInterpolate
+from merge_airfoil import Merge_Airfoil
 
 class WingPlotter:
-    def __init__(self, airfoil_root, break_point, chord_list, mix_list):
+    def __init__(self, airfoil_root, airfoil_tip, break_point, chord_list, mix_list):
         self.airfoil_root = airfoil_root
+        self.airfoil_tip = airfoil_tip
         self.break_point = break_point
         self.chord_list = chord_list
         self.mix_list = mix_list
 
     def airfoil_shape_func(self, mix):
-        dir_name = 'airfoil_data/FOILS'
-        airfoil = self.airfoil_root + '.dat'
-        path = Path.cwd()
-        airfoil_file = path / dir_name / airfoil
-        airfoil_df = pd.read_csv(
-            airfoil_file, header=None, delim_whitespace=True,
-            skipinitialspace=True, skiprows=1, dtype='float16'
-        )
+        airfoil_df = Merge_Airfoil(self.airfoil_root, self.airfoil_tip, [mix])
+        airfoil_df = airfoil_df.merge()
         airfoil_fx = AirfoilInterpolate(airfoil_df, 1, 0)
         airfoil_top_fx, airfoil_bottom_fx = airfoil_fx.airfoil_interpolate()
         x = np.linspace(0.01, 0.98, 100)
@@ -35,8 +31,8 @@ class WingPlotter:
         x_sections, y_sections, z_sections = [], [], []
         max_mix = max(self.mix_list)
         min_mix = min(self.mix_list)
-        norm = plt.Normalize(min_mix, max_mix)
-        cmap = plt.cm.rainbow
+        norm = plt.Normalize(0, 100)
+        cmap = plt.cm.Blues
 
         for i, y in enumerate(self.break_point):
             x_af, z_af = self.airfoil_shape_func(self.mix_list[i])
@@ -68,17 +64,23 @@ class WingPlotter:
         x_range = X.max() - X.min()
         y_range = Y.max() - Y.min()
         z_range = Z.max() - Z.min()
-        ax.set_box_aspect([x_range/1000, y_range*2/1000, z_range/1000])
-        fig.subplots_adjust(left=0.01, right=0.99, bottom=0.01, top=0.95)
+        ax.set_box_aspect([x_range, y_range*2, z_range])
+        fig.subplots_adjust(left=0.01, right=0.99, bottom=0.001, top=0.95)
         ax.view_init(elev=18, azim=-70)
+        # カラーバーを追加
+        mappable = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+        mappable.set_array([])
+        cbar = fig.colorbar(mappable, ax=ax, pad=0.01, shrink=0.2, orientation='vertical')
+        cbar.set_label('Mixing Ratio (%)')
         plt.savefig(filename, dpi=300, bbox_inches='tight')
         plt.show()
 
 # --- 利用例 ---
 if __name__ == '__main__':
     airfoil_root = 'dae31'
+    airfoil_tip = 'dae41'
     break_point = [0, 1.85, 5.08, 8.34, 11.705, 14.5]
     chord_list = [1.0, 1.0, 0.8, 0.6, 0.4, 0.2]
-    mix_list = [0, 20, 40, 60, 80, 100]
-    plotter = WingPlotter(airfoil_root, break_point, chord_list, mix_list)
+    mix_list = [80, 80, 70, 50, 30, 20]
+    plotter = WingPlotter(airfoil_root, airfoil_tip, break_point, chord_list, mix_list)
     plotter.plot_surface()
